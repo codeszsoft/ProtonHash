@@ -1,18 +1,52 @@
 #include <iostream>
 #include <filesystem>
+#include <string>
 #include <string_view>
 
 #include <stdint.h>
 
-uint32_t hash(const void* data, uintmax_t data_len)
+uint32_t hash(const void* data, uintmax_t len)
 {
-	if (!data) return 0;
-	int32_t hash = 0x55555555;
+	if (!data)
+		return 0;
 
-	for (uintmax_t i = 0; i < data_len; ++i)
-		hash = (hash >> 27) + (hash << 5) + static_cast<const uint8_t*>(data)[i];
+	uint32_t hash_ = 0x55555555;
+	for (uintmax_t i = 0; i < len; ++i)
+		hash_ = (hash_ >> 27) + (hash_ << 5) + static_cast<const uint8_t*>(data)[i];
+	
+	return hash_;
+}
 
-	return hash;
+uint8_t* get_data(const std::string& file, size_t* size)
+{
+	uint8_t* data = NULL;
+
+	FILE* open;
+
+#ifdef _WIN32
+	fopen_s(&open, file.c_str(), "rb");
+#else
+	fopen(&open, file.c_str(), "rb");
+#endif
+
+	if (!open) 
+		return 0;
+
+	fseek(open, 0, SEEK_END);
+	*size = ftell(open);
+	fseek(open, 0, SEEK_SET);
+
+	data = (uint8_t*)new uint8_t[((*size) + 1)];
+
+	if (!data)
+		std::cout << "Out of memory while opening " << file << "?" << std::endl;
+
+	data[*size] = 0;
+
+	fread(data, *size, 1, open);
+	fclose(open);
+
+	return data;
 }
 
 int main(int argc, char **argv)
@@ -32,7 +66,7 @@ int main(int argc, char **argv)
 	}
 
 	uint64_t size = std::filesystem::file_size(path);
-	uint8_t* data = static_cast<uint8_t*>(malloc(size));
+	uint8_t* data = get_data(path, &size);
 
 	std::cout << "file hash: " << hash(data, size) << std::endl;
 
